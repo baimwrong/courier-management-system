@@ -1,0 +1,4 @@
+tracking_number,status,location_city,location_details,description,manifest_code
+"CR-202610-884912","delivered","Bandung","Jl. Dago Asri No. 15","Delivered directly to recipient. Signed and confirmed.",""
+"CR-202610-771234","out_for_delivery","Bandung","Bandung DC - Citarum Area","With delivery courier on morning run sheet.","MNF-202610-0012"
+"CR-202610-339811","received_at_transit_hub","Semarang","Semarang Central Sorting Branch","Arrived via Java Trunk Line Truck. Staged for Surabaya container.","MNF-202610-0044"

@@ -1,0 +1,6 @@
+origin_city,origin_province,destination_city,destination_province,service_code,base_weight_kg,base_rate,per_kg_rate,estimated_etd
+"Jakarta","DKI Jakarta","Malang","Jawa Timur","REG",1.0,22000,16000,"2-3 Days"
+"Jakarta","DKI Jakarta","Malang","Jawa Timur","EXP",1.0,34000,24000,"1 Day"
+"Jakarta","DKI Jakarta","Solo","Jawa Tengah","REG",1.0,18000,12000,"2-3 Days"
+"Bandung","Jawa Barat","Denpasar","Bali","REG",1.0,26000,19000,"2-4 Days"
+"Surabaya","Jawa Timur","Makassar","Sulawesi Selatan","CARGO",10.0,75000,7500,"4-6 Days"
