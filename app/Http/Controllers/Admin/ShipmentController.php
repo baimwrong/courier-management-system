@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Service;
 use App\Models\Shipment;
+use App\Models\Tariff;
 use App\Models\User;
 use App\Services\ShipmentService;
 use Carbon\Carbon;
@@ -22,6 +23,7 @@ class ShipmentController extends Controller
     public function index(Request $request)
     {
         $query = Shipment::with(['originBranch', 'destinationBranch', 'service', 'courier'])->latest('id');
+        $query = $this->scopeShipmentsForUser($query, auth()->user());
 
         // Search
         if ($request->filled('search')) {
@@ -79,7 +81,14 @@ class ShipmentController extends Controller
         $customers = Customer::where('is_active', true)->orderBy('name')->get();
         $userBranchId = auth()->user()->branch_id;
 
-        return view('admin.shipments.create', compact('services', 'branches', 'customers', 'userBranchId'));
+        $tariffCities = Tariff::select('origin_city as city')
+            ->union(Tariff::select('destination_city as city'))
+            ->union(Branch::select('city as city'))
+            ->distinct()
+            ->orderBy('city')
+            ->pluck('city');
+
+        return view('admin.shipments.create', compact('services', 'branches', 'customers', 'userBranchId', 'tariffCities'));
     }
 
     public function store(Request $request)
@@ -139,6 +148,8 @@ class ShipmentController extends Controller
             'trackings.user',
         ])->findOrFail($id);
 
+        $this->authorizeShipmentAccess($shipment, auth()->user(), 'view');
+
         $couriers = User::where('role', 'courier')->where('is_active', true)->get();
         $branches = Branch::where('is_active', true)->get();
 
@@ -148,12 +159,43 @@ class ShipmentController extends Controller
     public function printLabel($id)
     {
         $shipment = Shipment::with(['originBranch', 'destinationBranch', 'service'])->findOrFail($id);
+        $this->authorizeShipmentAccess($shipment, auth()->user(), 'print');
+
         return view('admin.shipments.print', compact('shipment'));
+    }
+
+    public function printBatch(Request $request)
+    {
+        $rawIds = $request->input('ids');
+        if (is_string($rawIds)) {
+            $ids = array_filter(explode(',', $rawIds));
+        } elseif (is_array($rawIds)) {
+            $ids = array_filter($rawIds);
+        } else {
+            $ids = [];
+        }
+
+        if (empty($ids)) {
+            return redirect()->route('admin.shipments.index')->with('error', 'No shipments selected for batch printing.');
+        }
+
+        $query = Shipment::with(['originBranch', 'destinationBranch', 'service'])
+            ->whereIn('id', $ids);
+
+        $query = $this->scopeShipmentsForUser($query, auth()->user());
+        $shipments = $query->get();
+
+        if ($shipments->isEmpty()) {
+            return redirect()->route('admin.shipments.index')->with('error', 'No authorized shipments found for the selected IDs.');
+        }
+
+        return view('admin.shipments.print_batch', compact('shipments'));
     }
 
     public function updateStatus(Request $request, $id)
     {
         $shipment = Shipment::findOrFail($id);
+        $this->authorizeShipmentAccess($shipment, auth()->user(), 'update_status');
 
         $validated = $request->validate([
             'status' => 'required|string',
@@ -182,6 +224,7 @@ class ShipmentController extends Controller
     public function recordPod(Request $request, $id)
     {
         $shipment = Shipment::findOrFail($id);
+        $this->authorizeShipmentAccess($shipment, auth()->user(), 'pod');
 
         $validated = $request->validate([
             'pod_recipient_name' => 'required|string|max:150',
@@ -222,6 +265,7 @@ class ShipmentController extends Controller
     public function assignCourier(Request $request, $id)
     {
         $shipment = Shipment::findOrFail($id);
+        $this->authorizeShipmentAccess($shipment, auth()->user(), 'assign');
 
         $validated = $request->validate([
             'courier_id' => 'required|exists:users,id',
@@ -279,5 +323,72 @@ class ShipmentController extends Controller
             'success' => true,
             'charges' => $charges,
         ]);
+    }
+
+    /**
+     * Scope shipment query based on authenticated user's role and branch.
+     */
+    protected function scopeShipmentsForUser($query, User $user)
+    {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        if ($user->isCourier()) {
+            return $query->where(function ($q) use ($user) {
+                $q->where('assigned_courier_id', $user->id);
+                if ($user->branch_id) {
+                    $q->orWhere('origin_branch_id', $user->branch_id)
+                      ->orWhere('destination_branch_id', $user->branch_id)
+                      ->orWhere('current_branch_id', $user->branch_id);
+                }
+            });
+        }
+
+        if ($user->branch_id) {
+            return $query->where(function ($q) use ($user) {
+                $q->where('origin_branch_id', $user->branch_id)
+                  ->orWhere('destination_branch_id', $user->branch_id)
+                  ->orWhere('current_branch_id', $user->branch_id);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Authorize that the user has permission to access this shipment.
+     */
+    protected function authorizeShipmentAccess(Shipment $shipment, User $user, string $action = 'view'): void
+    {
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        if ($user->isCourier()) {
+            $isAssigned = $shipment->assigned_courier_id === $user->id;
+            $isSameBranch = $user->branch_id && in_array($user->branch_id, [
+                $shipment->origin_branch_id,
+                $shipment->destination_branch_id,
+                $shipment->current_branch_id,
+            ]);
+
+            if (!$isAssigned && !$isSameBranch) {
+                abort(403, 'Unauthorized access: You are not assigned to this shipment nor does it belong to your branch.');
+            }
+            return;
+        }
+
+        if ($user->branch_id) {
+            $isBranchRelated = in_array($user->branch_id, [
+                $shipment->origin_branch_id,
+                $shipment->destination_branch_id,
+                $shipment->current_branch_id,
+            ]);
+
+            if (!$isBranchRelated) {
+                abort(403, 'Unauthorized access: This shipment belongs to another operational branch.');
+            }
+        }
     }
 }

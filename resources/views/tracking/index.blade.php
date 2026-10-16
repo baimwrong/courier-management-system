@@ -149,7 +149,7 @@
                                         <h6 class="fw-bold mb-0">Proof of Delivery (POD)</h6>
                                     </div>
                                     <div class="small">
-                                        <div class="mb-1"><strong>Received By:</strong> {{ $s->pod_recipient_name }}</div>
+                                        <div class="mb-1"><strong>Received By:</strong> {{ $s->masked_pod_recipient_name }}</div>
                                         <div class="mb-1"><strong>Relationship:</strong> {{ $s->pod_relationship ?? 'Self' }}</div>
                                         <div class="mb-1"><strong>Date & Time:</strong> {{ $s->pod_delivered_at?->format('d M Y, H:i') }} WIB</div>
                                         @if($s->pod_notes)

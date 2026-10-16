@@ -59,7 +59,7 @@ class TrackingController extends Controller
                     'is_cod' => $s->isCod(),
                     'cod_amount' => $s->isCod() ? (float) $s->cod_amount : null,
                     'pod' => $s->isDelivered() ? [
-                        'recipient_name' => $s->pod_recipient_name,
+                        'recipient_name' => $s->masked_pod_recipient_name,
                         'relationship' => $s->pod_relationship,
                         'delivered_at' => $s->pod_delivered_at?->toIso8601String(),
                     ] : null,

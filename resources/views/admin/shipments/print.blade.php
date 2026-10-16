@@ -60,6 +60,10 @@
         }
 
         @media print {
+            @page {
+                size: 100mm 150mm;
+                margin: 0;
+            }
             body {
                 background: #fff !important;
                 padding: 0 !important;

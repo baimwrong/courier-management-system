@@ -99,8 +99,15 @@ class ReportController extends Controller
                 'POD Delivered At',
             ]);
 
+            $sanitize = function ($val) {
+                if (is_string($val) && strlen($val) > 0 && in_array($val[0], ['=', '+', '-', '@', "\t", "\r"])) {
+                    return "'" . $val;
+                }
+                return $val;
+            };
+
             foreach ($shipments as $s) {
-                fputcsv($handle, [
+                $row = [
                     $s->tracking_number,
                     $s->booking_date->toDateTimeString(),
                     $s->originBranch?->name ?? 'N/A',
@@ -120,7 +127,8 @@ class ReportController extends Controller
                     $s->status_label,
                     $s->pod_recipient_name,
                     $s->pod_delivered_at ? $s->pod_delivered_at->toDateTimeString() : '',
-                ]);
+                ];
+                fputcsv($handle, array_map($sanitize, $row));
             }
 
             fclose($handle);

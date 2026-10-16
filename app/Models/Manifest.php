@@ -63,12 +63,14 @@ class Manifest extends Model
     public static function generateManifestNumber(string $prefix = 'MNF'): string
     {
         $yearMonth = date('Ym');
-        $random = strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
-        $number = "{$prefix}-{$yearMonth}-{$random}";
+        $entropy = strtoupper(substr(bin2hex(random_bytes(2)), 0, 3) . substr((string) hrtime(true), -3));
+        $number = "{$prefix}-{$yearMonth}-{$entropy}";
 
-        while (static::where('manifest_number', $number)->exists()) {
-            $random = strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
-            $number = "{$prefix}-{$yearMonth}-{$random}";
+        $attempts = 0;
+        while (static::where('manifest_number', $number)->exists() && $attempts < 10) {
+            $entropy = strtoupper(substr(bin2hex(random_bytes(2)), 0, 3) . substr((string) hrtime(true), -3));
+            $number = "{$prefix}-{$yearMonth}-{$entropy}";
+            $attempts++;
         }
 
         return $number;

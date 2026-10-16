@@ -50,6 +50,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:superadmin,bra
 
     // Shipments & Waybills (General staff overview)
     Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');
+    Route::match(['get', 'post'], '/shipments/print-batch', [ShipmentController::class, 'printBatch'])->name('shipments.print_batch');
     Route::get('/shipments/{id}', [ShipmentController::class, 'show'])->name('shipments.show');
     Route::get('/shipments/{id}/print', [ShipmentController::class, 'printLabel'])->name('shipments.print');
 
@@ -59,11 +60,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:superadmin,bra
         Route::post('/shipments', [ShipmentController::class, 'store'])->name('shipments.store');
     });
 
+    // Courier assignment (managers and operators only)
+    Route::middleware(['role:superadmin,branch_manager,hub_operator'])->group(function () {
+        Route::post('/shipments/{id}/assign-courier', [ShipmentController::class, 'assignCourier'])->name('shipments.assign_courier');
+    });
+
     // Shipment milestone updates & POD (couriers, operators, managers)
     Route::middleware(['role:superadmin,branch_manager,hub_operator,courier'])->group(function () {
         Route::post('/shipments/{id}/update-status', [ShipmentController::class, 'updateStatus'])->name('shipments.update_status');
         Route::post('/shipments/{id}/pod', [ShipmentController::class, 'recordPod'])->name('shipments.pod');
-        Route::post('/shipments/{id}/assign-courier', [ShipmentController::class, 'assignCourier'])->name('shipments.assign_courier');
     });
 
     // Bulk Import Center (Staff and management)

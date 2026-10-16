@@ -146,13 +146,14 @@ class Shipment extends Model
     public static function generateTrackingNumber(string $prefix = 'CR'): string
     {
         $yearMonth = date('Ym');
-        $random = strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
-        $number = "{$prefix}-{$yearMonth}-{$random}";
+        $entropy = strtoupper(substr(bin2hex(random_bytes(3)), 0, 4) . substr((string) hrtime(true), -4));
+        $number = "{$prefix}-{$yearMonth}-{$entropy}";
 
-        // Ensure uniqueness
-        while (static::where('tracking_number', $number)->exists()) {
-            $random = strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
-            $number = "{$prefix}-{$yearMonth}-{$random}";
+        $attempts = 0;
+        while (static::where('tracking_number', $number)->exists() && $attempts < 10) {
+            $entropy = strtoupper(substr(bin2hex(random_bytes(3)), 0, 4) . substr((string) hrtime(true), -4));
+            $number = "{$prefix}-{$yearMonth}-{$entropy}";
+            $attempts++;
         }
 
         return $number;
@@ -270,6 +271,11 @@ class Shipment extends Model
         return self::maskName($this->sender_name);
     }
 
+    public function getMaskedPodRecipientNameAttribute(): string
+    {
+        return self::maskName($this->pod_recipient_name);
+    }
+
     public function getPublicRecipientAddressAttribute(): string
     {
         $parts = array_filter([$this->recipient_city, $this->recipient_province, $this->recipient_postal_code]);
@@ -291,7 +297,8 @@ class Shipment extends Model
         $words = explode(' ', trim($name));
         $maskedWords = array_map(function ($word) {
             $len = mb_strlen($word);
-            if ($len <= 2) return $word;
+            if ($len <= 1) return $word;
+            if ($len === 2) return mb_substr($word, 0, 1) . '*';
             return mb_substr($word, 0, 1) . str_repeat('*', min(4, $len - 1));
         }, $words);
         return implode(' ', $maskedWords);

@@ -31,7 +31,12 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-secondary text-uppercase">Origin City *</label>
-                            <input type="text" name="sender_city" id="senderCity" class="form-control" placeholder="e.g. Jakarta" value="{{ old('sender_city', auth()->user()->branch?->city ?? 'Jakarta') }}" required>
+                            <input type="text" name="sender_city" id="senderCity" list="tariffCities" class="form-control" placeholder="e.g. Jakarta" value="{{ old('sender_city', auth()->user()->branch?->city ?? 'Jakarta') }}" required>
+                            <datalist id="tariffCities">
+                                @foreach($tariffCities as $tc)
+                                    <option value="{{ $tc }}"></option>
+                                @endforeach
+                            </datalist>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-secondary text-uppercase">Origin Branch / Counter *</label>
@@ -77,7 +82,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-secondary text-uppercase">Destination City *</label>
-                            <input type="text" name="recipient_city" id="recipientCity" class="form-control" placeholder="e.g. Bandung" value="{{ old('recipient_city') }}" required>
+                            <input type="text" name="recipient_city" id="recipientCity" list="tariffCities" class="form-control" placeholder="e.g. Bandung" value="{{ old('recipient_city') }}" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-secondary text-uppercase">Destination Province</label>
@@ -150,7 +155,7 @@
                                 <div>
                                     <span class="text-secondary">Volumetric Weight:</span>
                                     <strong id="displayVolumetric" class="text-primary fs-6 ms-1">0.20 Kg</strong>
-                                    <span class="text-muted ms-2">(L*W*H / 5000)</span>
+                                    <span class="text-muted ms-2" id="divisorLabel">(L*W*H / 5000)</span>
                                 </div>
                                 <div>
                                     <span class="text-secondary">Billable / Chargeable:</span>
@@ -175,7 +180,7 @@
                         <label class="form-label small fw-bold text-secondary text-uppercase">Select Service Tier *</label>
                         <select name="service_id" id="serviceSelect" class="form-select form-select-lg calc-trigger" required>
                             @foreach($services as $srv)
-                                <option value="{{ $srv->id }}" {{ $srv->code === 'REG' ? 'selected' : '' }}>
+                                <option value="{{ $srv->id }}" data-volumetric-divisor="{{ $srv->volumetric_divisor ?? 5000 }}" {{ $srv->code === 'REG' ? 'selected' : '' }}>
                                     {{ $srv->code }} - {{ $srv->name }} ({{ $srv->etd_range }})
                                 </option>
                             @endforeach
@@ -268,11 +273,19 @@ document.addEventListener("DOMContentLoaded", function() {
         const height = parseFloat(document.getElementById('heightCm').value) || 10;
         const actual = parseFloat(document.getElementById('actualWeight').value) || 1;
 
-        const vol = (length * width * height) / 5000;
+        const serviceSelect = document.getElementById('serviceSelect');
+        const selectedOpt = serviceSelect.options[serviceSelect.selectedIndex];
+        const divisor = parseFloat(selectedOpt ? selectedOpt.getAttribute('data-volumetric-divisor') : 5000) || 5000;
+
+        const vol = (length * width * height) / divisor;
         const chargeable = Math.max(actual, vol);
 
         document.getElementById('displayVolumetric').textContent = vol.toFixed(2) + ' Kg';
         document.getElementById('displayChargeable').textContent = chargeable.toFixed(2) + ' Kg';
+        const divisorLbl = document.getElementById('divisorLabel');
+        if (divisorLbl) {
+            divisorLbl.textContent = `(L*W*H / ${divisor})`;
+        }
 
         // AJAX tariff lookup if cities entered
         const orig = document.getElementById('senderCity').value.trim();

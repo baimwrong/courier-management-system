@@ -68,6 +68,9 @@
             <span class="badge bg-secondary ms-2">{{ $shipments->total() }} Total</span>
         </div>
         <div class="d-flex gap-2">
+            <button type="submit" form="batchPrintForm" id="btnPrintBatch" class="btn btn-outline-dark btn-sm fw-bold" disabled>
+                <i class="fa-solid fa-print me-1"></i> Print Selected (<span id="selectedCount">0</span>)
+            </button>
             <a href="{{ route('admin.shipments.create') }}" class="btn btn-primary-custom btn-sm fw-bold">
                 <i class="fa-solid fa-plus me-1"></i> Book Shipment
             </a>
@@ -77,11 +80,19 @@
         </div>
     </div>
 
+    <!-- Hidden form for batch printing -->
+    <form id="batchPrintForm" action="{{ route('admin.shipments.print_batch') }}" method="POST" target="_blank">
+        @csrf
+    </form>
+
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr class="text-secondary small text-uppercase">
-                    <th class="ps-3">AWB / Date</th>
+                    <th class="ps-3" style="width: 36px;">
+                        <input type="checkbox" id="selectAllCheckbox" class="form-check-input" title="Select All On Page">
+                    </th>
+                    <th>AWB / Date</th>
                     <th>Shipper (Sender)</th>
                     <th>Consignee (Recipient)</th>
                     <th>Corridor / Route</th>
@@ -95,6 +106,9 @@
                 @forelse($shipments as $s)
                     <tr>
                         <td class="ps-3">
+                            <input type="checkbox" form="batchPrintForm" name="ids[]" value="{{ $s->id }}" class="form-check-input shipment-select-checkbox">
+                        </td>
+                        <td>
                             <a href="{{ route('admin.shipments.show', $s->id) }}" class="fw-bold text-primary text-decoration-none">
                                 {{ $s->tracking_number }}
                             </a>
@@ -151,7 +165,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center py-5 text-muted">
+                        <td colspan="9" class="text-center py-5 text-muted">
                             <i class="fa-solid fa-box-open fs-2 mb-2 d-block"></i>
                             No shipments found matching criteria.
                         </td>
@@ -166,3 +180,47 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAllCheckbox');
+    const checkboxes = document.querySelectorAll('.shipment-select-checkbox');
+    const btnPrint = document.getElementById('btnPrintBatch');
+    const countSpan = document.getElementById('selectedCount');
+
+    function updateSelectedState() {
+        const checkedCount = document.querySelectorAll('.shipment-select-checkbox:checked').length;
+        if (countSpan) countSpan.textContent = checkedCount;
+
+        if (btnPrint) {
+            if (checkedCount > 0) {
+                btnPrint.removeAttribute('disabled');
+                btnPrint.classList.remove('btn-outline-dark');
+                btnPrint.classList.add('btn-dark');
+            } else {
+                btnPrint.setAttribute('disabled', 'disabled');
+                btnPrint.classList.remove('btn-dark');
+                btnPrint.classList.add('btn-outline-dark');
+            }
+        }
+
+        if (selectAll) {
+            selectAll.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+            selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateSelectedState();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectedState);
+    });
+});
+</script>
+@endpush

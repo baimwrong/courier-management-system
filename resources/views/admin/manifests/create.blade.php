@@ -93,13 +93,23 @@
                 <div class="card-header bg-white border-bottom p-3 d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-boxes-packing text-primary me-2"></i> Select Shipments to Load</h6>
-                        <span class="text-secondary small">Check the shipments to include in this dispatch batch</span>
+                        <span class="text-secondary small">Check shipments or scan AWBs to include in this dispatch batch</span>
                     </div>
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelectAll">Select All</button>
                 </div>
 
-                <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
-                    <table class="table table-hover align-middle mb-0">
+                <!-- Continuous Barcode Gun Staging Input -->
+                <div class="p-3 bg-light border-bottom">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="fa-solid fa-barcode text-primary"></i></span>
+                        <input type="text" id="barcodeGunInput" class="form-control" placeholder="Scan AWB with barcode gun or type tracking number..." autofocus autocomplete="off">
+                        <button class="btn btn-outline-primary fw-bold" type="button" id="btnScanAdd">Stage AWB</button>
+                    </div>
+                    <div id="scanFeedback" class="small mt-1 text-muted">Ready for barcode scanner input (Code128).</div>
+                </div>
+
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-hover align-middle mb-0" id="manifestShipmentsTable">
                         <thead class="table-light sticky-top">
                             <tr class="text-secondary small text-uppercase">
                                 <th style="width: 40px;" class="ps-3"></th>
@@ -111,7 +121,7 @@
                         </thead>
                         <tbody>
                             @forelse($availableShipments as $as)
-                                <tr>
+                                <tr data-awb="{{ strtoupper(trim($as->tracking_number)) }}" id="row-shipment-{{ $as->id }}">
                                     <td class="ps-3">
                                         <input type="checkbox" name="shipment_ids[]" value="{{ $as->id }}" class="form-check-input shipment-check" checked>
                                     </td>
@@ -157,6 +167,46 @@ document.addEventListener("DOMContentLoaded", function() {
             document.querySelectorAll('.shipment-check').forEach(chk => chk.checked = allChecked);
             btnAll.textContent = allChecked ? 'Deselect All' : 'Select All';
         });
+    }
+
+    // Barcode Scanner Gun Buffer Handler
+    const gunInput = document.getElementById('barcodeGunInput');
+    const scanBtn = document.getElementById('btnScanAdd');
+    const feedback = document.getElementById('scanFeedback');
+
+    function handleScan() {
+        if (!gunInput) return;
+        const scannedCode = gunInput.value.trim().toUpperCase();
+        if (!scannedCode) return;
+
+        const row = document.querySelector(`tr[data-awb="${scannedCode}"]`);
+        if (row) {
+            const checkbox = row.querySelector('.shipment-check');
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+            row.classList.add('table-success');
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            feedback.innerHTML = `<span class="text-success fw-bold"><i class="fa-solid fa-check-circle me-1"></i> Staged Waybill ${scannedCode}</span>`;
+            setTimeout(() => row.classList.remove('table-success'), 2000);
+        } else {
+            feedback.innerHTML = `<span class="text-danger fw-bold"><i class="fa-solid fa-triangle-exclamation me-1"></i> Waybill ${scannedCode} not in pending list</span>`;
+        }
+
+        gunInput.value = '';
+        gunInput.focus();
+    }
+
+    if (gunInput) {
+        gunInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleScan();
+            }
+        });
+    }
+    if (scanBtn) {
+        scanBtn.addEventListener('click', handleScan);
     }
 });
 </script>

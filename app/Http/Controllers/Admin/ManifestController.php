@@ -149,23 +149,76 @@ class ManifestController extends Controller
 
     public function updateStatus(Request $request, $id)
     {
-        $manifest = Manifest::findOrFail($id);
+        $manifest = Manifest::with(['items.shipment', 'originBranch', 'destinationBranch'])->findOrFail($id);
 
         $validated = $request->validate([
             'status' => 'required|in:dispatched,in_transit,arrived,completed,cancelled',
         ]);
 
         $status = $validated['status'];
-        $data = ['status' => $status];
 
-        if ($status === 'dispatched' || $status === 'in_transit') {
-            $data['dispatched_at'] = Carbon::now();
-        } elseif ($status === 'arrived' || $status === 'completed') {
-            $data['received_at'] = Carbon::now();
-        }
+        DB::transaction(function () use ($manifest, $status) {
+            $data = ['status' => $status];
 
-        $manifest->update($data);
+            if ($status === 'dispatched' || $status === 'in_transit') {
+                $data['dispatched_at'] = Carbon::now();
+            } elseif ($status === 'arrived' || $status === 'completed') {
+                $data['received_at'] = Carbon::now();
+            }
 
-        return back()->with('success', "Manifest status updated to " . ucfirst(str_replace('_', ' ', $status)));
+            $manifest->update($data);
+
+            // Cascade status to child shipments when manifest arrives or completes
+            if ($status === 'arrived' || $status === 'completed') {
+                if ($manifest->type === 'inter_hub_transit' && $manifest->destination_branch_id) {
+                    $destBranch = $manifest->destinationBranch;
+                    $destCity = $destBranch?->city ?? 'Destination Hub';
+
+                    foreach ($manifest->items as $item) {
+                        $shipment = $item->shipment;
+                        if (!$shipment || in_array($shipment->current_status, ['delivered', 'cancelled', 'returned_to_sender'])) {
+                            continue;
+                        }
+
+                        $isFinalDest = $shipment->destination_branch_id === $manifest->destination_branch_id;
+                        $newStatus = $isFinalDest ? 'received_at_dest_branch' : 'received_at_transit_hub';
+                        $title = $isFinalDest
+                            ? "Received at Destination Branch [{$destBranch?->name}]"
+                            : "Processed at Transit Hub [{$destBranch?->name}]";
+
+                        $shipment->addTracking(
+                            status: $newStatus,
+                            title: $title,
+                            locationCity: $destCity,
+                            locationDetails: $destBranch?->name,
+                            description: "Unloaded and verified from transit container #{$manifest->manifest_number}.",
+                            userId: auth()->id(),
+                            branchId: $manifest->destination_branch_id,
+                            manifestCode: $manifest->manifest_number
+                        );
+
+                        $item->update([
+                            'status' => 'received',
+                            'scanned_at' => Carbon::now(),
+                        ]);
+                    }
+                } elseif ($manifest->type === 'delivery_run_sheet' && $status === 'completed') {
+                    foreach ($manifest->items as $item) {
+                        if ($item->shipment?->isDelivered()) {
+                            $item->update([
+                                'status' => 'delivered',
+                                'scanned_at' => Carbon::now(),
+                            ]);
+                        }
+                    }
+                }
+            } elseif ($status === 'cancelled') {
+                foreach ($manifest->items as $item) {
+                    $item->update(['status' => 'failed']);
+                }
+            }
+        });
+
+        return back()->with('success', "Manifest status updated to " . ucfirst(str_replace('_', ' ', $status)) . " and parcel milestones updated.");
     }
 }

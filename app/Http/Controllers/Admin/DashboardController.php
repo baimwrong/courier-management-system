@@ -55,13 +55,22 @@ class DashboardController extends Controller
             ->pluck('count', 'current_status')
             ->all();
 
-        // 7-day trend
+        // 7-day trend (Aggregated in a single database query)
+        $sevenDaysAgo = Carbon::today()->subDays(6)->startOfDay();
+        $countsByDate = (clone $branchQuery)
+            ->where('booking_date', '>=', $sevenDaysAgo)
+            ->select(DB::raw('DATE(booking_date) as date_str'), DB::raw('count(*) as count'))
+            ->groupBy('date_str')
+            ->pluck('count', 'date_str')
+            ->all();
+
         $trendDates = [];
         $trendCounts = [];
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::today()->subDays($i);
+            $dateKey = $date->toDateString();
             $trendDates[] = $date->format('d M');
-            $trendCounts[] = (clone $branchQuery)->whereDate('booking_date', $date)->count();
+            $trendCounts[] = (int) ($countsByDate[$dateKey] ?? 0);
         }
 
         // Service distribution
