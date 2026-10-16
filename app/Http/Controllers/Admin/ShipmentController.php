@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\ShipmentService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ShipmentController extends Controller
 {
@@ -112,6 +113,8 @@ class ShipmentController extends Controller
 
             'declared_goods_value' => 'nullable|numeric|min:0',
             'cod_amount' => 'nullable|numeric|min:0',
+            'other_fee' => 'nullable|numeric|min:0',
+            'discount_amount' => 'nullable|numeric|min:0',
             'payment_method' => 'required|string',
             'special_instructions' => 'nullable|string',
         ]);
@@ -161,15 +164,17 @@ class ShipmentController extends Controller
             'branch_id' => 'nullable|exists:branches,id',
         ]);
 
-        $shipment->addTracking(
-            status: $validated['status'],
-            title: $validated['title'],
-            locationCity: $validated['location_city'] ?: ($shipment->currentBranch?->city ?? 'Central Hub'),
-            locationDetails: $validated['location_details'],
-            description: $validated['description'],
-            userId: auth()->id(),
-            branchId: $validated['branch_id'] ?? auth()->user()->branch_id
-        );
+        DB::transaction(function () use ($shipment, $validated) {
+            $shipment->addTracking(
+                status: $validated['status'],
+                title: $validated['title'],
+                locationCity: $validated['location_city'] ?: ($shipment->currentBranch?->city ?? 'Central Hub'),
+                locationDetails: $validated['location_details'],
+                description: $validated['description'],
+                userId: auth()->id(),
+                branchId: $validated['branch_id'] ?? auth()->user()->branch_id
+            );
+        });
 
         return back()->with('success', "Tracking milestone logged and status updated to {$shipment->status_label}.");
     }
@@ -184,24 +189,32 @@ class ShipmentController extends Controller
             'pod_notes' => 'nullable|string',
         ]);
 
-        $shipment->update([
-            'current_status' => 'delivered',
-            'payment_status' => 'paid',
-            'pod_recipient_name' => $validated['pod_recipient_name'],
-            'pod_relationship' => $validated['pod_relationship'],
-            'pod_notes' => $validated['pod_notes'],
-            'pod_delivered_at' => Carbon::now(),
-        ]);
+        DB::transaction(function () use ($shipment, $validated) {
+            $updateData = [
+                'current_status' => 'delivered',
+                'pod_recipient_name' => $validated['pod_recipient_name'],
+                'pod_relationship' => $validated['pod_relationship'],
+                'pod_notes' => $validated['pod_notes'],
+                'pod_delivered_at' => Carbon::now(),
+            ];
 
-        $shipment->addTracking(
-            status: 'delivered',
-            title: "Delivered to [{$validated['pod_recipient_name']}]",
-            locationCity: $shipment->recipient_city,
-            locationDetails: 'Consignee Delivery Address',
-            description: "Package received by {$validated['pod_recipient_name']} ({$validated['pod_relationship']}). Notes: " . ($validated['pod_notes'] ?? 'None'),
-            userId: auth()->id(),
-            branchId: auth()->user()->branch_id
-        );
+            // If COD, mark paid upon proof of delivery
+            if ($shipment->isCod()) {
+                $updateData['payment_status'] = 'paid';
+            }
+
+            $shipment->update($updateData);
+
+            $shipment->addTracking(
+                status: 'delivered',
+                title: "Delivered to [{$validated['pod_recipient_name']}]",
+                locationCity: $shipment->recipient_city,
+                locationDetails: 'Consignee Delivery Address',
+                description: "Package received by {$validated['pod_recipient_name']} ({$validated['pod_relationship']}). Notes: " . ($validated['pod_notes'] ?? 'None'),
+                userId: auth()->id(),
+                branchId: auth()->user()->branch_id
+            );
+        });
 
         return back()->with('success', "Proof of Delivery successfully recorded for {$shipment->tracking_number}.");
     }
@@ -216,20 +229,22 @@ class ShipmentController extends Controller
 
         $courier = User::findOrFail($validated['courier_id']);
 
-        $shipment->update([
-            'assigned_courier_id' => $courier->id,
-            'current_status' => 'out_for_delivery',
-        ]);
+        DB::transaction(function () use ($shipment, $courier) {
+            $shipment->update([
+                'assigned_courier_id' => $courier->id,
+                'current_status' => 'out_for_delivery',
+            ]);
 
-        $shipment->addTracking(
-            status: 'out_for_delivery',
-            title: "Out for Delivery with [{$courier->name}]",
-            locationCity: $courier->branch?->city ?? $shipment->recipient_city,
-            locationDetails: $courier->vehicle_plate ? "Vehicle: {$courier->vehicle_type} ({$courier->vehicle_plate})" : null,
-            description: "Shipment assigned to courier {$courier->name} for immediate delivery run.",
-            userId: auth()->id(),
-            branchId: auth()->user()->branch_id
-        );
+            $shipment->addTracking(
+                status: 'out_for_delivery',
+                title: "Out for Delivery with [{$courier->name}]",
+                locationCity: $courier->branch?->city ?? $shipment->recipient_city,
+                locationDetails: $courier->vehicle_plate ? "Vehicle: {$courier->vehicle_type} ({$courier->vehicle_plate})" : null,
+                description: "Shipment assigned to courier {$courier->name} for immediate delivery run.",
+                userId: auth()->id(),
+                branchId: auth()->user()->branch_id
+            );
+        });
 
         return back()->with('success', "Courier {$courier->name} assigned for delivery.");
     }

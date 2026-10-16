@@ -88,7 +88,7 @@
                     <div class="col-md-3">
                         <span class="text-secondary small text-uppercase fw-bold">Destination</span>
                         <div class="fw-bold fs-6 text-dark">{{ $s->recipient_city }}</div>
-                        <div class="small text-muted">{{ $s->recipient_address }}</div>
+                        <div class="small text-muted">{{ $s->public_recipient_address }}</div>
                     </div>
                     <div class="col-md-3">
                         <span class="text-secondary small text-uppercase fw-bold">Package Specs</span>
@@ -166,13 +166,13 @@
                             </h6>
                             <div class="mb-3 small">
                                 <span class="text-secondary fw-bold text-uppercase" style="font-size: 0.7rem;">Shipper / Pengirim</span>
-                                <div class="fw-bold text-dark">{{ $s->sender_name }}</div>
-                                <div class="text-muted">{{ $s->sender_city }}</div>
+                                <div class="fw-bold text-dark">{{ $s->masked_sender_name }}</div>
+                                <div class="text-muted">{{ $s->sender_city }} ({{ $s->masked_sender_phone }})</div>
                             </div>
                             <div class="small">
                                 <span class="text-secondary fw-bold text-uppercase" style="font-size: 0.7rem;">Consignee / Penerima</span>
-                                <div class="fw-bold text-dark">{{ $s->recipient_name }}</div>
-                                <div class="text-muted">{{ $s->recipient_city }}</div>
+                                <div class="fw-bold text-dark">{{ $s->masked_recipient_name }}</div>
+                                <div class="text-muted">{{ $s->recipient_city }} ({{ $s->masked_recipient_phone }})</div>
                             </div>
                         </div>
 

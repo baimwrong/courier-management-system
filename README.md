@@ -284,20 +284,5 @@ Duration: 0.64s
 
 ---
 
-## 🔒 Git Note
-
-Per your request:
-> *"please don't commit the project since i want to do the commit myself"*
-
-No Git commits have been made. You can review all files, run `git status`, and commit the project whenever you are ready:
-
-```powershell
-git status
-git add .
-git commit -m "feat: complete courier and logistics management system"
-```
-
----
-
 ## 📄 License
 This project is open-sourced under the [MIT License](LICENSE).

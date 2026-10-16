@@ -30,7 +30,8 @@ class ShipmentAndBulkImportTest extends TestCase
         $response = $this->get('/track/' . $shipment->tracking_number);
         $response->assertStatus(200);
         $response->assertSee($shipment->tracking_number);
-        $response->assertSee($shipment->sender_name);
+        $response->assertSee($shipment->masked_sender_name);
+        $response->assertSee($shipment->sender_city);
     }
 
     public function test_shipping_rates_calculator_computes_tariffs(): void

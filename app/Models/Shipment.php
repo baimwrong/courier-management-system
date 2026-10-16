@@ -249,4 +249,51 @@ class Shipment extends Model
             default => 'bg-secondary',
         };
     }
+
+    public function getMaskedSenderPhoneAttribute(): string
+    {
+        return self::maskPhone($this->sender_phone);
+    }
+
+    public function getMaskedRecipientPhoneAttribute(): string
+    {
+        return self::maskPhone($this->recipient_phone);
+    }
+
+    public function getMaskedRecipientNameAttribute(): string
+    {
+        return self::maskName($this->recipient_name);
+    }
+
+    public function getMaskedSenderNameAttribute(): string
+    {
+        return self::maskName($this->sender_name);
+    }
+
+    public function getPublicRecipientAddressAttribute(): string
+    {
+        $parts = array_filter([$this->recipient_city, $this->recipient_province, $this->recipient_postal_code]);
+        return implode(', ', $parts) ?: 'Destination Area (Address Protected)';
+    }
+
+    public static function maskPhone(?string $phone): string
+    {
+        if (empty($phone)) return '-';
+        $cleaned = preg_replace('/[^\d+]/', '', $phone);
+        $len = strlen($cleaned);
+        if ($len <= 6) return substr($cleaned, 0, 2) . '****';
+        return substr($cleaned, 0, 4) . '****' . substr($cleaned, -3);
+    }
+
+    public static function maskName(?string $name): string
+    {
+        if (empty($name)) return '-';
+        $words = explode(' ', trim($name));
+        $maskedWords = array_map(function ($word) {
+            $len = mb_strlen($word);
+            if ($len <= 2) return $word;
+            return mb_substr($word, 0, 1) . str_repeat('*', min(4, $len - 1));
+        }, $words);
+        return implode(' ', $maskedWords);
+    }
 }

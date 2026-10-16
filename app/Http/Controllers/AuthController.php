@@ -14,13 +14,16 @@ class AuthController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        $demoUsers = User::with('branch')->whereIn('email', [
-            'admin@courier.test',
-            'manager.jkt@courier.test',
-            'hub.cgk@courier.test',
-            'courier.budi@courier.test',
-            'cashier.siti@courier.test',
-        ])->get();
+        $demoUsers = collect();
+        if (app()->isLocal() || config('app.demo_mode', false)) {
+            $demoUsers = User::with('branch')->whereIn('email', [
+                'admin@courier.test',
+                'manager.jkt@courier.test',
+                'hub.cgk@courier.test',
+                'courier.budi@courier.test',
+                'cashier.siti@courier.test',
+            ])->get();
+        }
 
         return view('auth.login', compact('demoUsers'));
     }
@@ -33,6 +36,14 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            $user = Auth::user();
+            if (!$user->is_active) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return back()->withErrors(['email' => 'Your account has been deactivated.'])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
             return redirect()->intended(route('admin.dashboard'));
         }
@@ -44,8 +55,16 @@ class AuthController extends Controller
 
     public function quickLogin(Request $request)
     {
+        if (!app()->isLocal() && !config('app.demo_mode', false)) {
+            abort(403, 'Quick demo login is disabled in this environment.');
+        }
+
         $request->validate(['user_id' => 'required|exists:users,id']);
         $user = User::findOrFail($request->user_id);
+
+        if (!$user->is_active) {
+            return redirect()->route('login')->withErrors(['email' => 'Selected account is deactivated.']);
+        }
 
         Auth::login($user);
         $request->session()->regenerate();

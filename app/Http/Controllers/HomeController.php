@@ -16,10 +16,10 @@ class HomeController extends Controller
         $cities = Branch::where('is_active', true)->distinct()->pluck('city')->sort()->values();
 
         $stats = [
-            'total_shipments' => Shipment::count() + 158420,
-            'active_hubs' => Branch::count(),
+            'total_shipments' => Shipment::count(),
+            'active_hubs' => Branch::where('is_active', true)->count(),
             'sla_rate' => '99.4%',
-            'provinces_covered' => 38,
+            'provinces_covered' => Branch::where('is_active', true)->distinct('province')->count('province') ?: 38,
         ];
 
         return view('home', compact('services', 'branches', 'cities', 'stats'));

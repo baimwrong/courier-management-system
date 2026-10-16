@@ -54,6 +54,7 @@
                             <span>All Shipments</span>
                         </a>
                     </li>
+                    @if(in_array(auth()->user()->role, ['superadmin', 'branch_manager', 'hub_operator', 'cashier']))
                     <li class="nav-item">
                         <a href="{{ route('admin.shipments.create') }}" class="nav-link {{ request()->routeIs('admin.shipments.create') ? 'active' : '' }}">
                             <i class="fa-solid fa-plus-circle text-warning"></i>
@@ -67,6 +68,7 @@
                             <span class="badge bg-danger ms-auto small">CSV</span>
                         </a>
                     </li>
+                    @endif
                     <li class="nav-item">
                         <a href="{{ route('admin.manifests.index') }}" class="nav-link {{ request()->routeIs('admin.manifests.*') ? 'active' : '' }}">
                             <i class="fa-solid fa-truck-ramp-box"></i>
@@ -75,6 +77,7 @@
                     </li>
                 </ul>
 
+                @if(in_array(auth()->user()->role, ['superadmin', 'branch_manager']))
                 <div class="nav-header">Master & Rates</div>
                 <ul class="nav nav-pills flex-column mb-auto">
                     <li class="nav-item">
@@ -83,12 +86,14 @@
                             <span>Tariff Rate Matrix</span>
                         </a>
                     </li>
+                    @if(auth()->user()->isSuperAdmin())
                     <li class="nav-item">
                         <a href="{{ route('admin.branches.index') }}" class="nav-link {{ request()->routeIs('admin.branches.*') ? 'active' : '' }}">
                             <i class="fa-solid fa-network-wired"></i>
                             <span>Hubs & Branches</span>
                         </a>
                     </li>
+                    @endif
                     <li class="nav-item">
                         <a href="{{ route('admin.users.index') }}" class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
                             <i class="fa-solid fa-users-gear"></i>
@@ -106,6 +111,7 @@
                         </a>
                     </li>
                 </ul>
+                @endif
             </div>
 
             <!-- Footer / System status -->
@@ -132,7 +138,8 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-3">
-                    <!-- Quick Demo Role Switcher (Helpful for pair testing!) -->
+                    <!-- Quick Demo Role Switcher (Available in local/demo mode only) -->
+                    @if(app()->isLocal() || config('app.demo_mode', false))
                     <div class="dropdown">
                         <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
                             <i class="fa-solid fa-user-switch me-1"></i> Switch Role (Demo)
@@ -181,6 +188,7 @@
                             </li>
                         </ul>
                     </div>
+                    @endif
 
                     <!-- User Profile Dropdown -->
                     <div class="dropdown">
